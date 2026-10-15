@@ -73,9 +73,13 @@ def make_weights(experts, hidden, intermediate, mode, scale):
 
 def activation(x, weights, args):
     gate, up = x.to(torch.bfloat16).float().chunk(2, -1)
-    gate = gate.clamp(max=args.clamp)
+    if args.activation == 'swiglu':
+        gate = gate.clamp(max=args.clamp)
     up = up.clamp(-args.clamp, args.clamp)
-    return gate * torch.sigmoid(gate * args.alpha) * (up + args.beta) * weights
+    gate = gate * torch.sigmoid(gate * args.alpha)
+    if args.activation == 'swiglustep':
+        gate = gate.clamp(max=args.clamp)
+    return gate * (up + args.beta) * weights
 
 
 def reference(x, shared_x, indices, weights, w, sw, mode, args, rank, world):
@@ -220,7 +224,7 @@ def run(local_rank, local_world, args):
         stats = torch.zeros(args.experts // world, dtype=torch.int32, device='cuda')
         kwargs = dict(shared_l1_weights=shared_transformed[0], shared_l2_weights=shared_transformed[1],
                       cumulative_local_expert_recv_stats=stats,
-                      activation_clamp=args.clamp, activation_alpha=args.alpha, activation_beta=args.beta,
+                      activation=args.activation, activation_clamp=args.clamp, activation_alpha=args.alpha, activation_beta=args.beta,
                       fast_math=not args.exact_math)
         if nv:
             kwargs.update(l1_alpha=l1_alpha, l2_alpha=l2_alpha, l2_activation_scale=args.mid_scale,
@@ -360,6 +364,7 @@ def parse_args():
     p.add_argument('--weight-scale', type=float, default=1.0)
     p.add_argument('--mid-scale', type=float, default=1.0)
     p.add_argument('--x-scales', action='store_true', help='per-token FP32 input scales (NVFP4 only)')
+    p.add_argument('--activation', choices=('swiglu', 'swiglustep'), default='swiglu')
     p.add_argument('--alpha', type=float, default=1.702)
     p.add_argument('--beta', type=float, default=1.0)
     p.add_argument('--clamp', type=float, default=7.0)

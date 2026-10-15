@@ -460,6 +460,7 @@ def nvfp4_mega_moe(
     l2_alpha=None,
     l2_activation_scale=1.0,
     use_x_scales=False,
+    activation="swiglu",
 ):
     return _torch_ops.nvfp4_mega_moe(
         y,
@@ -486,6 +487,7 @@ def nvfp4_mega_moe(
         l2_alpha,
         l2_activation_scale,
         use_x_scales,
+        activation,
     )
 
 

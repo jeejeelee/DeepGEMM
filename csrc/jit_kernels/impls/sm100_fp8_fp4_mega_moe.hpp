@@ -33,6 +33,7 @@ static void sm100_fp8_fp4_mega_moe(
     const int& num_tokens, const int& num_topk,
     const int& hidden, const int& intermediate_hidden,
     const float& activation_clamp,
+    const bool& clamp_after_silu,
     const float& activation_alpha,
     const float& activation_beta,
     const bool& fast_math
@@ -173,6 +174,7 @@ static void __instantiate_kernel() {{
         {},
         {},
         {},
+        {},
         {}
     >);
 }};
@@ -190,6 +192,7 @@ static void __instantiate_kernel() {{
         config.num_dispatch_threads, config.num_non_epilogue_threads, config.num_epilogue_threads,
         num_sms, num_ranks,
         to_string(activation_clamp),
+        clamp_after_silu ? "true" : "false",
         to_string(activation_alpha),
         to_string(activation_beta),
         fast_math ? "true" : "false",

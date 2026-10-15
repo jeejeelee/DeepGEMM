@@ -93,7 +93,8 @@ def nvfp4_mega_moe(y: torch.Tensor,
                   l1_alpha: Optional[torch.Tensor] = None,
                   l2_alpha: Optional[torch.Tensor] = None,
                   l2_activation_scale: float = 1.0,
-                  use_x_scales: bool = False):
+                  use_x_scales: bool = False,
+                  activation: str = 'swiglu'):
     """Fused NVFP4 routed experts and MXFP8 or BF16 shared experts (SM100/SM103).
 
     Routed inputs/weights are packed E2M1 with one E4M3 scale per 16 values;
@@ -108,6 +109,8 @@ def nvfp4_mega_moe(y: torch.Tensor,
     the products of activation and weight global dequantization scales.
     ``l2_activation_scale`` is the positive global dequantization scale used
     when quantizing routed SwiGLU outputs; include it in ``l2_alpha``.
+    ``activation='swiglustep'`` clips the gate after SiLU and supports routed
+    experts only, with alpha=1 and beta=0. The default clips before SiLU.
     Defaults use unit global scales. The routed L2 input is the unweighted
     SwiGLU output, so calibrate ``l2_activation_scale`` on it (as for a
     checkpoint's down-projection input scale). Combine multiplies each routed
@@ -117,6 +120,10 @@ def nvfp4_mega_moe(y: torch.Tensor,
     scale per routed input token; it multiplies that token's L1 accumulator
     together with ``l1_alpha``, before BF16 rounding and the activation.
     """
+    assert activation in ('swiglu', 'swiglustep'), f'Unsupported activation: {activation}'
+    if activation == 'swiglustep':
+        assert activation_alpha == 1.0 and activation_beta == 0.0
+        assert sym_buffer.num_shared_experts == 0, 'swiglustep supports routed experts only'
     assert isinstance(sym_buffer, NVFP4SymmBuffer), 'NVFP4 requires NVFP4SymmBuffer'
     assert (shared_l1_weights is not None) == (sym_buffer.num_shared_experts > 0)
     assert (shared_l2_weights is not None) == (sym_buffer.num_shared_experts > 0)
@@ -140,5 +147,5 @@ def nvfp4_mega_moe(y: torch.Tensor,
         sym_buffer.num_experts, sym_buffer.num_topk,
         activation_clamp, fast_math,
         activation_alpha, activation_beta,
-        l1_alpha, l2_alpha, l2_activation_scale, use_x_scales
+        l1_alpha, l2_alpha, l2_activation_scale, use_x_scales, activation
     )

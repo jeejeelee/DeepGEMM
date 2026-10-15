@@ -34,6 +34,7 @@ template <
     uint32_t kNumEpilogueThreads,
     uint32_t kNumSMs, uint32_t kNumRanks,
     float kActivationClamp,
+    bool kClampAfterSilu,
     float kActivationAlpha,
     float kActivationBeta,
     bool kFastMath,
@@ -1116,7 +1117,8 @@ sm100_fp8_fp4_mega_moe_impl(void* y,
 
                             // Clamp
                             if constexpr (kActivationClamp != cute::numeric_limits<float>::infinity()) {
-                                bf16_gate = __hmin2(bf16_gate, {kActivationClamp, kActivationClamp});
+                                if constexpr (not kClampAfterSilu)
+                                    bf16_gate = __hmin2(bf16_gate, {kActivationClamp, kActivationClamp});
                                 bf16_up = __hmax2(bf16_up, {-kActivationClamp, -kActivationClamp});
                                 bf16_up = __hmin2(bf16_up, {kActivationClamp, kActivationClamp});
                             }
@@ -1138,6 +1140,8 @@ sm100_fp8_fp4_mega_moe_impl(void* y,
                             } else {
                                 gated = {gate.x / denom.x, gate.y / denom.y};
                             }
+                            if constexpr (kClampAfterSilu and kActivationClamp != cute::numeric_limits<float>::infinity())
+                                gated = {fminf(gated.x, kActivationClamp), fminf(gated.y, kActivationClamp)};
                             auto up = __bfloat1622float2(bf16_up);
                             if constexpr (kActivationBeta != 0.0f)
                                 up = __fadd2_rn(up, {kActivationBeta, kActivationBeta});

@@ -115,7 +115,7 @@ static SymmBufferLayoutInfo build_symm_buffer_layout(
     const std::string& mma_type, const std::string& activation,
     const int& num_shared_experts = 0) {
     DG_HOST_ASSERT(num_experts % num_ranks == 0);
-    DG_HOST_ASSERT(activation == "swiglu" or activation == "situ");
+    DG_HOST_ASSERT(activation == "swiglu" or activation == "swiglustep" or activation == "situ");
     DG_HOST_ASSERT(num_shared_experts >= 0);
 
     // Ring capacity: worst-case live pool blocks over all candidate BLOCK_M; mirrors the kernel assert.
@@ -291,13 +291,17 @@ static void fp8_fp4_mega_moe(
     const auto num_tokens = static_cast<int>(y.size(0));
     const auto [rm, rn, rk] = recipe;
     DG_HOST_ASSERT(rm == 1 and rn == 1 and rk == 32);
-    DG_HOST_ASSERT(activation == "swiglu" or activation == "situ");
+    DG_HOST_ASSERT(activation == "swiglu" or activation == "swiglustep" or activation == "situ");
     DG_HOST_ASSERT(shared_l1_weights_tuple_opt.has_value() == shared_l2_weights_tuple_opt.has_value());
 
     // Activation checks
     const auto activation_clamp =
         activation_clamp_opt.value_or(std::numeric_limits<float>::infinity());
     DG_HOST_ASSERT(activation_clamp >= 0);
+    if (activation == "swiglustep") {
+        DG_HOST_ASSERT(activation_alpha == 1.0f and activation_beta == 0.0f);
+        DG_HOST_ASSERT(not shared_l1_weights_tuple_opt.has_value());
+    }
     DG_HOST_ASSERT(std::isfinite(activation_alpha));
     DG_HOST_ASSERT(std::isfinite(activation_beta));
     if (activation == "situ") {
@@ -403,7 +407,7 @@ static void fp8_fp4_mega_moe(
                    activation_alpha, activation_beta, fast_math);
         } else {
             launch(sm100_fp8_fp4_mega_moe,
-                   activation_clamp, activation_alpha, activation_beta, fast_math);
+                   activation_clamp, activation == "swiglustep", activation_alpha, activation_beta, fast_math);
         }
     } else {
         DG_HOST_UNREACHABLE("Unsupported architecture");
@@ -434,13 +438,17 @@ static void bf16_mega_moe(
 ) {
     // Config checks
     const auto num_tokens = static_cast<int>(y.size(0));
-    DG_HOST_ASSERT(activation == "swiglu");
+    DG_HOST_ASSERT(activation == "swiglu" or activation == "swiglustep");
     DG_HOST_ASSERT(shared_l1_weights_opt.has_value() == shared_l2_weights_opt.has_value());
 
     // Activation checks
     const auto activation_clamp =
         activation_clamp_opt.value_or(std::numeric_limits<float>::infinity());
     DG_HOST_ASSERT(activation_clamp >= 0);
+    if (activation == "swiglustep") {
+        DG_HOST_ASSERT(activation_alpha == 1.0f and activation_beta == 0.0f);
+        DG_HOST_ASSERT(not shared_l1_weights_opt.has_value());
+    }
     DG_HOST_ASSERT(std::isfinite(activation_alpha));
     DG_HOST_ASSERT(std::isfinite(activation_beta));
 
@@ -516,7 +524,7 @@ static void bf16_mega_moe(
                             num_shared_experts,
                             num_tokens, num_topk,
                             hidden, intermediate_hidden,
-                            activation_clamp, activation_alpha, activation_beta,
+                            activation_clamp, activation == "swiglustep", activation_alpha, activation_beta,
                             fast_math);
     } else {
         DG_HOST_UNREACHABLE("Unsupported architecture");

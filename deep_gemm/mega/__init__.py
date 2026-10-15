@@ -15,7 +15,7 @@ except Exception as exception:
 from .. import _C
 
 
-_SUPPORTED_ACTIVATIONS = ('swiglu', 'situ')
+_SUPPORTED_ACTIVATIONS = ('swiglu', 'swiglustep', 'situ')
 
 
 def _validate_activation(activation: str) -> None:
@@ -214,8 +214,8 @@ def bf16_mega_moe(y: torch.Tensor,
                   fast_math: bool = True,
                   activation_alpha: float = 1.0,
                   activation_beta: float = 0.0):
-    assert activation == 'swiglu', \
-        f'BF16 Mega MoE only supports `swiglu`, got `{activation}`'
+    assert activation in ('swiglu', 'swiglustep'), \
+        f'BF16 Mega MoE supports `swiglu` or `swiglustep`, got `{activation}`'
     _C.bf16_mega_moe(
         y,
         l1_weights,

@@ -232,3 +232,11 @@ This code repository is released under [the MIT License](LICENSE).
       howpublished = {\url{https://github.com/deepseek-ai/DeepGEMM}},
 }
 ```
+
+### Stepfun routed-expert activation
+
+`bf16_mega_moe`, `fp8_fp4_mega_moe`, and `nvfp4_mega_moe` accept
+`activation='swiglustep'` for `min(silu(gate), limit) * clamp(up, -limit, limit)`.
+Use `activation_clamp=7`, `activation_alpha=1`, `activation_beta=0`, and
+`num_shared_experts=0`. Shared experts are computed separately by the caller.
+The default `swiglu` behavior is unchanged.
